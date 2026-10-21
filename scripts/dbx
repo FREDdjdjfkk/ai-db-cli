@@ -1,5 +1,5 @@
 #!/bin/sh
-set -eu
+set -e
 # Installer copies a launcher, never a symlink: resolve relative to its stable bundle path.
 dbx_bin_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 dbx_bundle=$(CDPATH='' cd -- "$dbx_bin_dir/.." && pwd)

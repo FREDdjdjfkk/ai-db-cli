@@ -6,7 +6,11 @@ cd "$(dirname "$0")/.."
 version=0.1.0
 arch=$(uname -m)
 case "$arch" in arm64|x86_64) ;; *) echo 'Unsupported architecture' >&2; exit 1;; esac
-mvn -B -s settings.xml "${@}" package
+if [ "$#" -gt 0 ]; then
+    mvn -B -s settings.xml "$@" package
+else
+    mvn -B -s settings.xml package
+fi
 bundle="dist/dbx-$version-macos-$arch"
 [ ! -e "$bundle" ] || { echo "Build output already exists: $bundle (remove it before rebuilding)" >&2; exit 1; }
 mkdir -p "$bundle/lib" "$bundle/bin"
