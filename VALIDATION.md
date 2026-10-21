@@ -1,6 +1,8 @@
 # Validation · 2026-10-21
 
-- Automated tests: 30 passed, 0 failed, 0 skipped on macOS Apple Silicon.
+- Automated tests: 31 passed, 0 failed, 0 skipped on macOS Apple Silicon.
+- CI exposed a deadline/options race: the timeout is now captured before worker
+  execution, with a regression test covering repeated command execution.
 - Redis: a disposable loopback-only Redis instance verified reads, explicitly
   permitted writes, key-prefix restrictions and rejection of admin commands.
 - SQL: H2 verified prepared parameters, exact decimal output, row truncation,
