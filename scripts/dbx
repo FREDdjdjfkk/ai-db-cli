@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+# Installer copies a launcher, never a symlink: resolve relative to its stable bundle path.
+dbx_bin_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+dbx_bundle=$(CDPATH='' cd -- "$dbx_bin_dir/.." && pwd)
+exec "$dbx_bundle/runtime/bin/java" -Xmx256m -XX:+ExitOnOutOfMemoryError -jar "$dbx_bundle/lib/dbx.jar" "$@"
