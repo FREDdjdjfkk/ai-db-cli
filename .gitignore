@@ -1,0 +1,9 @@
+target/
+dist/
+.idea/
+*.iml
+.DS_Store
+.env
+connections.json
+*.log
+tmp/
