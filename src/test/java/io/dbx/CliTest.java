@@ -40,4 +40,7 @@ class CliTest {
         Files.writeString(dir.resolve("connections.json"),"{broken"); assertEquals(2,run("connections","list").status);
         Files.writeString(dir.resolve("connections.json"),"null"); assertEquals(2,run("connections","list").status);
     }
+    @Test void deadlineSurvivesConcurrentOptionReparsing() {
+        for (int i=0; i<40; i++) assertEquals(0,run("--timeout","30","capabilities").status);
+    }
 }
