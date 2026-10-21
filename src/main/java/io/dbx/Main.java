@@ -37,8 +37,10 @@ public final class Main implements Runnable {
         try {
             cli.parseArgs(args);
             if (root.timeout < 1 || root.timeout > 120) throw Failure.usage("timeout must be 1..120 seconds");
+            // execute() reparses and resets option fields on the worker; snapshot before starting it.
+            final int deadlineSeconds = root.timeout;
             var executor = Executors.newSingleThreadExecutor(r -> { var t = new Thread(r, "dbx-command"); t.setDaemon(true); return t; });
-            try { status = executor.submit(() -> cli.execute(args)).get(root.timeout, TimeUnit.SECONDS); }
+            try { status = executor.submit(() -> cli.execute(args)).get(deadlineSeconds, TimeUnit.SECONDS); }
             catch (TimeoutException e) { failure[0] = new Failure(5, "TIMEOUT", "Process deadline exceeded; for writes, verify server state before retrying"); status = 5; }
             finally { executor.shutdownNow(); }
         } catch (Failure f) { failure[0] = f; status = f.exit; }
