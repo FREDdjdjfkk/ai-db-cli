@@ -9,6 +9,7 @@ final class Profile {
     String user;
     String schema;
     String passwordEnv;
+    String passwordKeychain;
     int database;
     boolean tls;
     boolean allowWrites;
@@ -32,12 +33,17 @@ final class Profile {
         if (keyPrefixes.stream().anyMatch(s -> s == null || s.isEmpty())) throw Failure.usage("Key prefixes must be nonempty");
         for (String c : redisWriteCommands) if (c == null || !RedisAdapter.WRITES.contains(c.toUpperCase(Locale.ROOT))) throw Failure.usage("Unsupported Redis write command");
         if (passwordEnv != null && !passwordEnv.matches("[A-Za-z_][A-Za-z0-9_]*")) throw Failure.usage("Invalid password environment variable name");
+        if (passwordKeychain != null) Keychain.validateReference(passwordKeychain);
     }
     private static List<String> concat(List<String> a, List<String> b) { var c = new ArrayList<>(a); c.addAll(b); return c; }
     String password() {
+        return password(System.getenv(), new Keychain());
+    }
+    String password(Map<String,String> environment, Keychain keychain) {
+        String value = passwordEnv == null ? null : environment.get(passwordEnv);
+        if (value != null && !value.isEmpty()) return value;
+        if (passwordKeychain != null) return keychain.read(passwordKeychain);
         if (passwordEnv == null) return null;
-        String value = System.getenv(passwordEnv);
-        if (value == null || value.isEmpty()) throw new Failure(2, "MISSING_SECRET", "Configured password environment variable is unset or empty");
-        return value;
+        throw new Failure(2,"MISSING_SECRET","Password environment variable is unset in this session; save it once with dbx connections save-password -c <name>");
     }
 }

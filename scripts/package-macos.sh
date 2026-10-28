@@ -19,7 +19,7 @@ cp README.md LICENSE THIRD_PARTY_NOTICES.md "$bundle/"
 cp -R third_party "$bundle/third_party"
 cp scripts/install.sh "$bundle/install.sh"
 cp scripts/dbx "$bundle/bin/dbx"
-"$JAVA_HOME/bin/jlink" --add-modules java.se,jdk.crypto.ec,jdk.unsupported --strip-debug --no-header-files --no-man-pages --output "$bundle/runtime"
+"$JAVA_HOME/bin/jlink" --add-modules java.se,jdk.crypto.ec,jdk.unsupported,jdk.charsets --strip-debug --no-header-files --no-man-pages --output "$bundle/runtime"
 chmod +x "$bundle/bin/dbx" "$bundle/install.sh"
 "$bundle/bin/dbx" capabilities
 tar -czf "$bundle.tar.gz" -C dist "$(basename "$bundle")"

@@ -58,12 +58,80 @@ public final class Main implements Runnable {
     static abstract class Connected implements Callable<Integer> {
         @Option(names={"-c", "--connection"}, required=true) String connection;
     }
-    @Command(name="connections", mixinStandardHelpOptions=true, subcommands={ListConnections.class, AddConnection.class, RemoveConnection.class})
+    @Command(name="connections", mixinStandardHelpOptions=true, subcommands={ListConnections.class, AddConnection.class, RemoveConnection.class, ConnectionStatus.class, SavePassword.class})
     static final class Connections extends Group {}
     @Command(name="list", mixinStandardHelpOptions=true)
     static final class ListConnections implements Callable<Integer> {
         @ParentCommand Connections parent;
         public Integer call() throws Exception { parent.root.result = parent.root.store().read(); return 0; }
+    }
+    @Command(name="status", mixinStandardHelpOptions=true, description="Show configuration location and credential availability without revealing passwords.")
+    static final class ConnectionStatus implements Callable<Integer> {
+        @ParentCommand Connections parent;
+        public Integer call() throws Exception {
+            var root=parent.root; var store=root.store(); var items=new ArrayList<Object>();
+            for (var entry:store.read().entrySet()) {
+                Profile p=entry.getValue(); var item=new LinkedHashMap<String,Object>();
+                String env=p.passwordEnv == null ? null : System.getenv(p.passwordEnv);
+                String source="not_configured"; boolean available=false; String keychainStatus=null;
+                if (env!=null && !env.isEmpty()) { source="environment"; available=true; }
+                else if (p.passwordKeychain!=null) {
+                    source="keychain";
+                    try { available=new Keychain().contains(p.passwordKeychain); keychainStatus=available ? "record_found" : "access_required_or_missing"; }
+                    catch (Failure f) { keychainStatus="unavailable"; }
+                } else if (p.passwordEnv!=null) source="environment_missing";
+                item.put("name",entry.getKey()); item.put("type",p.type); item.put("readOnly",!p.allowWrites);
+                item.put("credentialSource",source); item.put("passwordAvailable",available);
+                if (keychainStatus!=null) item.put("keychainStatus",keychainStatus);
+                if (p.passwordKeychain!=null && !available && source.equals("keychain"))
+                    item.put("nextAction","Check login keychain and execution permissions before asking for a password or replacing saved credentials");
+                items.add(item);
+            }
+            Path defaultPath=Path.of(System.getProperty("user.home"),".config","dbx","connections.json").toAbsolutePath().normalize();
+            Path selected=root.config.toAbsolutePath().normalize();
+            root.result=Map.of("configPath",selected.toString(),"defaultConfigPath",defaultPath.toString(),
+                    "usingDefaultConfig",selected.equals(defaultPath),"configExists",Files.exists(selected),"connections",items);
+            return 0;
+        }
+    }
+    @Command(name="save-password", mixinStandardHelpOptions=true, description="Save a password to macOS Keychain once for use in future sessions.")
+    static final class SavePassword extends Connected {
+        @ParentCommand Connections parent;
+        @Option(names="--from-env", description="Read the password from this environment variable") String fromEnv;
+        @Option(names="--password-stdin", description="Read a single-line password from stdin (never from argv)") boolean stdin;
+        public Integer call() throws Exception {
+            if (fromEnv!=null && stdin) throw Failure.usage("Choose --from-env or --password-stdin");
+            // Validate the profile before reading a password or making keychain changes.
+            var store=parent.root.store(); store.get(connection);
+            String password;
+            if (fromEnv!=null) {
+                if (!fromEnv.matches("[A-Za-z_][A-Za-z0-9_]*")) throw Failure.usage("Invalid environment variable name");
+                password=System.getenv(fromEnv);
+            } else if (stdin) {
+                byte[] bytes=System.in.readNBytes(65537);
+                if (bytes.length>65536) throw Failure.usage("Password input exceeds 64 KiB");
+                password=new String(bytes,StandardCharsets.UTF_8);
+                if (password.endsWith("\n")) { password=password.substring(0,password.length()-1); if (password.endsWith("\r")) password=password.substring(0,password.length()-1); }
+            } else {
+                var console=System.console();
+                if (console==null) throw Failure.usage("Noninteractive use requires --from-env <name> or --password-stdin");
+                System.err.print("Database password: ");
+                char[] entered=console.readPassword(); System.err.println();
+                password=entered==null ? null : new String(entered);
+                if (entered!=null) Arrays.fill(entered,'\0');
+            }
+            if (password==null || password.isEmpty()) throw new Failure(2,"MISSING_SECRET","Password input or selected environment variable is empty");
+            String value=password;
+            store.update(data -> {
+                Profile p=data.get(connection);
+                if (p==null) throw new Failure(2,"CONNECTION_NOT_FOUND","Connection no longer exists");
+                String reference=p.passwordKeychain==null ? UUID.randomUUID().toString() : p.passwordKeychain;
+                new Keychain().save(reference,value);
+                p.passwordKeychain=reference;
+            });
+            parent.root.result=Map.of("name",connection,"saved",true,"credentialSource","keychain","reusableAcrossSessions",true);
+            return 0;
+        }
     }
     @Command(name="add", mixinStandardHelpOptions=true, description="Add a named connection. Secrets are environment references only.")
     static final class AddConnection implements Callable<Integer> {

@@ -12,7 +12,11 @@ import static java.nio.file.StandardOpenOption.*;
 
 final class ConfigStore {
     private final Path path;
-    ConfigStore(Path path) { this.path = path.toAbsolutePath(); }
+    ConfigStore(Path path) {
+        if (path == null || path.toString().isBlank()) throw Failure.usage("Config path cannot be empty; omit --config to use the persistent default");
+        this.path = path.toAbsolutePath().normalize();
+        if (Files.isDirectory(this.path)) throw Failure.usage("Config path must be a JSON file, not a directory");
+    }
     Map<String, Profile> read() throws IOException {
         if (!Files.exists(path)) return new TreeMap<>();
         if (Files.isSymbolicLink(path)) throw Failure.usage("Config must not be a symbolic link");
